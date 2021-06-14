@@ -15,6 +15,7 @@ nav:
         - 'End user': 'user-guide/end-user.md'
         - 'QGIS Model and Python API': 'user-guide/processing.md'
     - Processing: processing/README.md
+    - Documentation: CodeDocumentation.md
     - Changelog: changelog.md
     - Contributing: contributing.md
     - References: references.md
@@ -43,6 +44,12 @@ markdown_extensions:
   - attr_list:
   - admonition:
   - pymdownx.details:
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      watch:
+        - QuickOSM
 
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js
