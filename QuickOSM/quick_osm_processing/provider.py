@@ -15,6 +15,9 @@ from QuickOSM.quick_osm_processing.advanced.build_query import (
 #   DownloadOverpassUrl)
 from QuickOSM.quick_osm_processing.advanced.open_osm_file import OpenOsmFile
 from QuickOSM.quick_osm_processing.advanced.raw_query import RawQueryAlgorithm
+from QuickOSM.quick_osm_processing.quickosm_process import (
+    DownloadOSMDataRawQuery,
+)
 
 __copyright__ = 'Copyright 2019, 3Liz'
 __license__ = 'GPL version 3'
@@ -49,3 +52,4 @@ class Provider(QgsProcessingProvider):
         self.addAlgorithm(RawQueryAlgorithm())
         # self.addAlgorithm(DownloadOverpassUrl())
         self.addAlgorithm(OpenOsmFile())
+        self.addAlgorithm(DownloadOSMDataRawQuery())
