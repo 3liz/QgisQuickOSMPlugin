@@ -82,6 +82,8 @@ class RawQueryAlgorithm(BuildRaw):
 
     def processAlgorithm(self, parameters, context, feedback) -> Dict[str, str]:
         """Run the algorithm."""
+        self.feedback = feedback
+        self.fetch_based_parameters(parameters, context)
 
         crs_4326 = QgsCoordinateReferenceSystem(4326)
         transform = QgsCoordinateTransform(
