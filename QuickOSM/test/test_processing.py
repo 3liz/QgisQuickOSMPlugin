@@ -197,6 +197,26 @@ class TestProcessing(unittest.TestCase):
         self.assertIsInstance(result['OUTPUT_OTHER_RELATIONS'], QgsVectorLayer)
         self.assertIn('|layername=other_relations', result['OUTPUT_OTHER_RELATIONS'].source())
 
+    def test_process(self):
+        """Test for the prosecc algorithm."""
+        result = processing.run(
+            'quickosm:downloadosmdatarawquery',
+            {
+                'QUERY':
+                    '[out:xml] [timeout:25];\n area(3600028722) -> .area_0;\n'
+                    '(\n    node[\"amenity\"=\"bench\"](area.area_0);\n    '
+                    'way[\"amenity\"=\"bench\"](area.area_0);\n    '
+                    'relation[\"amenity\"=\"bench\"](area.area_0);\n);\n'
+                    '(._;>;);\nout body;',
+                'TIMEOUT': 25, 'SERVER': 'https://lz4.overpass-api.de/api/interpreter',
+                'EXTENT': '3.809971100,3.963647400,43.557942300,43.654612100 [EPSG:4326]',
+                'AREA': '',
+                'FILE': ''
+            }
+        )
+
+        self.assertIsInstance(result['OUTPUT_POINTS'], QgsVectorLayer)
+
 
 if __name__ == '__main__':
     unittest.main()

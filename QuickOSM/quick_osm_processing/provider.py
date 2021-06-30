@@ -13,6 +13,9 @@ from QuickOSM.quick_osm_processing.advanced.build_query import (
 
 # from .advanced.download_overpass import (
 #   DownloadOverpassUrl)
+from QuickOSM.quick_osm_processing.advanced.decorate_output import (
+    DecorateLayerAlgorithm,
+)
 from QuickOSM.quick_osm_processing.advanced.open_osm_file import OpenOsmFile
 from QuickOSM.quick_osm_processing.advanced.raw_query import RawQueryAlgorithm
 from QuickOSM.quick_osm_processing.quickosm_process import (
@@ -53,3 +56,4 @@ class Provider(QgsProcessingProvider):
         # self.addAlgorithm(DownloadOverpassUrl())
         self.addAlgorithm(OpenOsmFile())
         self.addAlgorithm(DownloadOSMDataRawQuery())
+        self.addAlgorithm(DecorateLayerAlgorithm())
