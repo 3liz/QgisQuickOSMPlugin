@@ -19,7 +19,7 @@ from QuickOSM.qgis_plugin_tools.tools.i18n import tr
 
 
 class BuildBased(QgisAlgorithm):
-    """Set up the parameters for a raw query input."""
+    """Set up the parameters."""
 
     TIMEOUT = 'TIMEOUT'
     SERVER = 'SERVER'
@@ -28,6 +28,8 @@ class BuildBased(QgisAlgorithm):
         """Constructor"""
         super().__init__()
         self.feedback = None
+        self.area = None
+        self.extent = None
         self.timeout = None
         self.server = None
 
@@ -80,9 +82,7 @@ class BuildRaw(BuildBased):
         """Constructor"""
         super().__init__()
         self.query = None
-        self.extent = None
         self.crs = None
-        self.area = None
 
     def fetch_based_parameters(self, parameters, context):
         """Get the parameters."""
@@ -93,6 +93,8 @@ class BuildRaw(BuildBased):
 
     def add_top_parameters(self):
         """Set up the parameters."""
+        super().add_top_parameters()
+
         param = QgsProcessingParameterString(
             self.QUERY, tr('Query'), optional=False, multiLine=True
         )
@@ -139,3 +141,57 @@ class BuildRaw(BuildBased):
         else:
             param.tooltip_3liz = help_string
         self.addParameter(param)
+
+
+class BuildBasedQuery(BuildBased):
+    """Set up the parameters for a query input."""
+
+    KEY = 'KEY'
+    VALUE = 'VALUE'
+
+    def __init__(self):
+        super().__init__()
+        self.key = None
+        self.value = None
+        self.distance = None
+
+    def fetch_based_parameters(self, parameters, context):
+        """Get the parameters."""
+        self.key = self.parameterAsString(parameters, self.KEY, context)
+        self.value = self.parameterAsString(parameters, self.VALUE, context)
+
+    def add_top_parameters(self):
+        """Set up the parameters."""
+        super().add_top_parameters()
+
+        param = QgsProcessingParameterString(
+            self.KEY, tr('Key, default to all keys'), optional=True
+        )
+        help_string = tr(
+            'The OSM key to use. It can be empty and it will default to all keys. '
+            'Multiple keys can be be ask by adding the separator \',\' between each key.'
+            'In this case make sure the number of keys match the number of values'
+        )
+        if Qgis.QGIS_VERSION_INT >= 31500:
+            param.setHelp(help_string)
+        else:
+            param.tooltip_3liz = help_string
+        self.addParameter(param)
+
+        param = QgsProcessingParameterString(
+            self.VALUE, tr('Value, default to all values'), optional=True
+        )
+        help_string = tr(
+            'The OSM value to use. It can be empty and it will default to all values.'
+            'Multiple values can be be ask by adding the separator \',\' between each value.'
+            'In this case make sure the number of values match the number of keys'
+        )
+        if Qgis.QGIS_VERSION_INT >= 31500:
+            param.setHelp(help_string)
+        else:
+            param.tooltip_3liz = help_string
+        self.addParameter(param)
+
+    def add_bottom_parameters(self):
+        """Set up the advanced parameters."""
+        super().add_bottom_parameters()
