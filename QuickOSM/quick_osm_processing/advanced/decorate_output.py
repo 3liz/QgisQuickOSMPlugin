@@ -104,6 +104,7 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
         fields = self.layer.fields().names()
         layer_type = self.layer.wkbType()
         if "colour" in fields:
+            self.feedback.pushInfo('Creating the style from OSM data "colour".')
             index = fields.index('colour')
             colors = self.layer.uniqueValues(index)
             categories = []
@@ -123,8 +124,10 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
             renderer = QgsCategorizedSymbolRenderer("colour", categories)
             self.layer.setRenderer(renderer)
 
+        self.feedback.pushInfo('Set up the QuickOSM actions on the layer.')
         actions.add_actions(self.layer, fields)
 
+        self.feedback.pushInfo('Write the metadata of the layer.')
         metadata = QgsLayerMetadata()
         metadata.setRights([tr("© OpenStreetMap contributors")])
         metadata.setLicenses(['https://openstreetmap.org/copyright'])

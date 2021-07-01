@@ -216,6 +216,9 @@ class TestProcessing(unittest.TestCase):
         )
 
         self.assertIsInstance(result['OUTPUT_POINTS'], QgsVectorLayer)
+        self.assertIsInstance(result['OUTPUT_LINES'], QgsVectorLayer)
+        self.assertIsInstance(result['OUTPUT_MULTILINESTRINGS'], QgsVectorLayer)
+        self.assertIsInstance(result['OUTPUT_MULTIPOLYGONS'], QgsVectorLayer)
 
 
 if __name__ == '__main__':

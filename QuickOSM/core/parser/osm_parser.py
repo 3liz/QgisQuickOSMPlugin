@@ -7,7 +7,7 @@ from typing import List
 import processing
 
 from osgeo import gdal
-from qgis.core import QgsField, QgsVectorLayer
+from qgis.core import QgsField, QgsProcessingFeedback, QgsVectorLayer
 from qgis.PyQt.QtCore import QObject, QVariant, pyqtSignal
 
 from QuickOSM.core.exceptions import FileOutPutException, QuickOsmException
@@ -60,7 +60,8 @@ class OsmParser(QObject):
             key: List[str] = None,
             delete_empty_layers: bool = False,
             load_only: bool = False,
-            osm_conf: str = None):
+            osm_conf: str = None,
+            feedback: QgsProcessingFeedback = None):
         self.__osmFile = osm_file
         if layers is None:
             self.__layers = self.OSM_LAYERS
@@ -94,6 +95,8 @@ class OsmParser(QObject):
             self._osm_conf = join(current_dir, 'QuickOSMconf.ini')
         else:
             self._osm_conf = osm_conf
+
+        self.feedback = feedback
 
         QObject.__init__(self)
 
@@ -151,12 +154,14 @@ class OsmParser(QObject):
             expected_fields = self.__whiteListColumn[layer] if self.__whiteListColumn[layer] else ''
 
             # Get the other_tags
+            if self.feedback:
+                self.feedback.pushInfo('Explode the other_tags field in layer {}.'.format(layer))
             layers[layer]['vector_layer'] = processing.run(
                 "native:explodehstorefield", {
                     'INPUT': layers[layer]['vectorLayer'],
                     'FIELD': 'other_tags', 'EXPECTED_FIELDS': expected_fields,
                     'OUTPUT': 'TEMPORARY_OUTPUT'
-                }
+                }, feedback=self.feedback
             )['OUTPUT']
 
             layers[layer]['vector_layer'].startEditing()
@@ -275,7 +280,7 @@ class OsmParser(QObject):
                     'INPUT': layers[layer]['vector_layer'],
                     'FIELDS_MAPPING': fields_mapping,
                     'OUTPUT': layers[layer]['layer_name']
-                })['OUTPUT']
+                }, feedback=self.feedback)['OUTPUT']
 
                 if self.__output_dir:
                     layers[layer]['vector_layer'] = QgsVectorLayer(

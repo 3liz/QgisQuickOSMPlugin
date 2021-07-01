@@ -1,4 +1,5 @@
 """Run the process of the plugin as an algorithm."""
+from os.path import dirname, basename
 
 import processing
 
@@ -8,14 +9,16 @@ from qgis.core import (
     QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingContext,
+    QgsProcessingMultiStepFeedback,
     QgsProcessingOutputVectorLayer,
     QgsProcessingParameterDefinition,
-    QgsProcessingParameterFile,
+    QgsProcessingParameterFileDestination,
     QgsProcessingUtils,
 )
 
 from QuickOSM.core.api.connexion_oapi import ConnexionOAPI
 from QuickOSM.core.parser.osm_parser import OsmParser
+from QuickOSM.definitions.format import Format
 from QuickOSM.qgis_plugin_tools.tools.i18n import tr
 
 __copyright__ = 'Copyright 2021, 3Liz'
@@ -49,13 +52,14 @@ class DownloadOSMData(QgisAlgorithm):
 
     def fetch_based_parameters(self, parameters, context):
         """Get the parameters."""
-        self.file = self.parameterAsFile(parameters, self.FILE, context)
+        self.file = self.parameterAsFileOutput(parameters, self.FILE, context)
 
     def add_output_file_parameter(self):
         """Set up the output file parameter."""
-        param = QgsProcessingParameterFile(
+        param = QgsProcessingParameterFileDestination(
             self.FILE, tr('Output file'),
-            extension='gpkg', optional=True)
+            optional=True)
+        param.setFileFilter('*.gpkg')
         param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
         help_string = tr('Path where the file will be download.')
         if Qgis.QGIS_VERSION_INT >= 31500:
@@ -138,8 +142,23 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
 
     def processAlgorithm(self, parameters, context, feedback):
         """Run the algorithm."""
-        self.feedback = feedback
+        self.feedback = QgsProcessingMultiStepFeedback(5, feedback)
         self.fetch_based_parameters(parameters, context)
+
+        self.feedback.setCurrentStep(0)
+
+        if self.feedback.isCanceled():
+            self.feedback.pushDebug('Aie canceled')
+            outputs = {
+                self.OUTPUT_POINTS: None,
+                self.OUTPUT_LINES: None,
+                self.OUTPUT_MULTILINESTRINGS: None,
+                self.OUTPUT_MULTIPOLYGONS: None
+            }
+            return outputs
+
+        self.feedback.setCurrentStep(1)
+        self.feedback.pushInfo('Building the query.')
 
         raw_query = processing.run(
             "quickosm:buildrawquery",
@@ -148,42 +167,72 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
                 'EXTENT': self.extent,
                 'QUERY': self.query,
                 'SERVER': self.server
-            }
+            },
+            feedback=self.feedback
         )
+
+        self.feedback.setCurrentStep(2)
+        self.feedback.pushInfo('Downloading data and OSM file.')
 
         url = raw_query['OUTPUT_URL']
         connexion_overpass_api = ConnexionOAPI(url)
         osm_file = connexion_overpass_api.run()
 
+        self.feedback.setCurrentStep(3)
+        self.feedback.pushInfo('Processing downloaded file.')
+
+        out_dir = dirname(self.file) if self.file else None
+        out_file = basename(self.file)[:-5] if self.file else None
+
         osm_parser = OsmParser(
-            osm_file=osm_file
+            osm_file=osm_file,
+            output_format=Format.GeoPackage,
+            output_dir=out_dir,
+            prefix_file=out_file,
+            feedback=self.feedback
         )
 
         layers = osm_parser.processing_parse()
-        """
+
+        self.feedback.setCurrentStep(4)
+        self.feedback.pushInfo('Decorating the requested layers.')
+
+        layer_output = []
+        OUTPUT = {
+            'points': self.OUTPUT_POINTS,
+            'lines': self.OUTPUT_LINES,
+            'multilinestrings': self.OUTPUT_MULTILINESTRINGS,
+            'multipolygons': self.OUTPUT_MULTIPOLYGONS
+        }
+
         for layer in layers:
             layers[layer]['layer_decorated'] = processing.run(
                 "quickosm:decoratelayer",
                 {
                     'LAYER': layers[layer]['vector_layer']
-                }
+                },
+                feedback=self.feedback
             )
-        """
-        context.temporaryLayerStore().addMapLayer(layers['points']['vector_layer'])
-        point = QgsProcessingUtils.mapLayerFromString(layers['points']['vector_layer'].id(), context, True)
-        context.addLayerToLoadOnCompletion(
-            layers['points']['vector_layer'].id(),
-            QgsProcessingContext.LayerDetails(
-                'OSMQuery_points',
-                context.project(),
-                self.OUTPUT_POINTS
+
+            context.temporaryLayerStore().addMapLayer(layers[layer]['vector_layer'])
+            layer_output.append(
+                QgsProcessingUtils.mapLayerFromString(
+                    layers[layer]['vector_layer'].id(), context, True
+                )
             )
-        )
+            context.addLayerToLoadOnCompletion(
+                layers[layer]['vector_layer'].id(),
+                QgsProcessingContext.LayerDetails(
+                    'OSMQuery_' + layer,
+                    context.project(),
+                    OUTPUT[layer]
+                )
+            )
 
         outputs = {
-            self.OUTPUT_POINTS: point.id(),
-            self.OUTPUT_LINES: layers['lines']['vector_layer'].id(),
-            self.OUTPUT_MULTILINESTRINGS: layers['multilinestrings']['vector_layer'].id(),
-            self.OUTPUT_MULTIPOLYGONS: layers['multipolygons']['vector_layer'].id(),
+            self.OUTPUT_POINTS: layer_output[0].id(),
+            self.OUTPUT_LINES: layer_output[1].id(),
+            self.OUTPUT_MULTILINESTRINGS: layer_output[2].id(),
+            self.OUTPUT_MULTIPOLYGONS: layer_output[3].id(),
         }
         return outputs

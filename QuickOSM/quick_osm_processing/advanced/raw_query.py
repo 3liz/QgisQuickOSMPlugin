@@ -90,6 +90,8 @@ class RawQueryAlgorithm(BuildRaw):
             self.crs, crs_4326, QgsProject.instance())
         self.extent = transform.transform(self.extent)
 
+        self.feedback.pushInfo('Prepare the url.')
+
         query_preparation = QueryPreparation(
             self.query,
             extent=self.extent,

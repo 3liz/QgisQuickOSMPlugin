@@ -113,7 +113,7 @@ class BuildRaw(BuildBased):
 
         param = QgsProcessingParameterExtent(
             self.EXTENT, tr('Extent, if "{{bbox}}" in the query'),
-            optional=True
+            defaultValue='0,1,0,1 []', optional=True
         )
         param.setFlags(
             param.flags() | QgsProcessingParameterDefinition.FlagAdvanced
