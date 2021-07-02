@@ -25,6 +25,12 @@ __copyright__ = 'Copyright 2021, 3Liz'
 __license__ = 'GPL version 3'
 __email__ = 'info@3liz.org'
 
+from QuickOSM.quick_osm_processing.advanced.build_query import (
+    BuildQueryAroundAreaAlgorithm,
+    BuildQueryExtentAlgorithm,
+    BuildQueryInAreaAlgorithm,
+    BuildQueryNotSpatialAlgorithm,
+)
 from QuickOSM.quick_osm_processing.build_input import BuildRaw
 
 
@@ -37,10 +43,27 @@ class DownloadOSMData(QgisAlgorithm):
     OUTPUT_MULTILINESTRINGS = 'OUTPUT_MULTILINESTRINGS'
     OUTPUT_MULTIPOLYGONS = 'OUTPUT_MULTIPOLYGONS'
 
+    OUTPUT_CANCEL = {
+        OUTPUT_POINTS: None,
+        OUTPUT_LINES: None,
+        OUTPUT_MULTILINESTRINGS: None,
+        OUTPUT_MULTIPOLYGONS: None
+    }
+
     def __init__(self):
         """Constructor"""
         super().__init__()
         self.file = None
+
+    @staticmethod
+    def group() -> str:
+        """Return the group of the algorithm."""
+        return ''
+
+    @staticmethod
+    def groupId() -> str:
+        """Return the id of the group."""
+        return ''
 
     def shortHelpString(self) -> str:
         """Return an helper for the algorithm."""
@@ -48,14 +71,14 @@ class DownloadOSMData(QgisAlgorithm):
 
     def flags(self):
         """Return the flags."""
-        return super().flags() | QgsProcessingAlgorithm.FlagHideFromModeler
+        return QgisAlgorithm.flags(self) | QgsProcessingAlgorithm.FlagHideFromModeler
 
     def fetch_based_parameters(self, parameters, context):
         """Get the parameters."""
         self.file = self.parameterAsFileOutput(parameters, self.FILE, context)
 
-    def add_output_file_parameter(self):
-        """Set up the output file parameter."""
+    def add_parameters(self):
+        """Set up additional parameters."""
         param = QgsProcessingParameterFileDestination(
             self.FILE, tr('Output file'),
             optional=True)
@@ -71,7 +94,7 @@ class DownloadOSMData(QgisAlgorithm):
     def add_outputs(self):
         """Set up the outputs of the algorithm."""
         output = QgsProcessingOutputVectorLayer(
-            self.OUTPUT_POINTS, self.tr('Output points'), QgsProcessing.TypeVectorPoint)
+            self.OUTPUT_POINTS, tr('Output points'), QgsProcessing.TypeVectorPoint)
         help_string = tr('The point layer from the OGR OSM driver.')
         if Qgis.QGIS_VERSION_INT >= 31500:
             pass
@@ -81,7 +104,7 @@ class DownloadOSMData(QgisAlgorithm):
         self.addOutput(output)
 
         output = QgsProcessingOutputVectorLayer(
-            self.OUTPUT_LINES, self.tr('Output lines'), QgsProcessing.TypeVectorLine)
+            self.OUTPUT_LINES, tr('Output lines'), QgsProcessing.TypeVectorLine)
         help_string = tr('The line layer from the OGR OSM driver.')
         if Qgis.QGIS_VERSION_INT >= 31500:
             pass
@@ -91,7 +114,7 @@ class DownloadOSMData(QgisAlgorithm):
         self.addOutput(output)
 
         output = QgsProcessingOutputVectorLayer(
-            self.OUTPUT_MULTILINESTRINGS, self.tr('Output multilinestrings'),
+            self.OUTPUT_MULTILINESTRINGS, tr('Output multilinestrings'),
             QgsProcessing.TypeVectorLine
         )
         help_string = tr('The multilinestrings layer from the OGR OSM driver.')
@@ -103,7 +126,7 @@ class DownloadOSMData(QgisAlgorithm):
         self.addOutput(output)
 
         output = QgsProcessingOutputVectorLayer(
-            self.OUTPUT_MULTIPOLYGONS, self.tr('Output multipolygons'),
+            self.OUTPUT_MULTIPOLYGONS, tr('Output multipolygons'),
             QgsProcessing.TypeVectorPolygon
         )
         help_string = tr('The multipolygon layer from the OGR OSM driver.')
@@ -116,89 +139,30 @@ class DownloadOSMData(QgisAlgorithm):
 
     def initAlgorithm(self, config=None):
         """Set up of the algorithm."""
+        _ = config
         self.add_top_parameters()
         self.add_bottom_parameters()
-        self.add_output_file_parameter()
+        self.add_parameters()
         self.add_outputs()
 
-
-class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
-    """Run the process of the plugin as an algorithm with a raw query input."""
-
-    @staticmethod
-    def name() -> str:
-        """Return the name of the algorithm."""
-        return 'downloadosmdatarawquery'
-
-    @staticmethod
-    def displayName() -> str:
-        """Return the display name of the algorithm."""
-        return tr('Download OSM data from a raw query')
-
-    def fetch_based_parameters(self, parameters, context):
-        """Get the parameters."""
-        BuildRaw.fetch_based_parameters(self, parameters, context)
-        DownloadOSMData.fetch_based_parameters(self, parameters, context)
-
-    def processAlgorithm(self, parameters, context, feedback):
-        """Run the algorithm."""
-        self.feedback = QgsProcessingMultiStepFeedback(9, feedback)
-        self.fetch_based_parameters(parameters, context)
-
-        self.feedback.setCurrentStep(0)
-
-        if self.feedback.isCanceled():
-            self.feedback.reportError('The algorithm has been canceled.')
-            outputs = {
-                self.OUTPUT_POINTS: None,
-                self.OUTPUT_LINES: None,
-                self.OUTPUT_MULTILINESTRINGS: None,
-                self.OUTPUT_MULTIPOLYGONS: None
-            }
-            return outputs
-
-        self.feedback.setCurrentStep(1)
-        self.feedback.pushInfo('Building the query.')
-
-        raw_query = processing.run(
-            "quickosm:buildrawquery",
-            {
-                'AREA': self.area,
-                'EXTENT': self.extent,
-                'QUERY': self.query,
-                'SERVER': self.server
-            },
-            feedback=self.feedback
-        )
+    def process_road(self, context, url):
+        """Major step of the process"""
 
         if self.feedback.isCanceled():
             self.feedback.reportError('The algorithm has been canceled during the building of the url.')
-            outputs = {
-                self.OUTPUT_POINTS: None,
-                self.OUTPUT_LINES: None,
-                self.OUTPUT_MULTILINESTRINGS: None,
-                self.OUTPUT_MULTIPOLYGONS: None
-            }
-            return outputs
+            return self.OUTPUT_CANCEL
 
-        self.feedback.setCurrentStep(2)
+        self.feedback.setCurrentStep(1)
         self.feedback.pushInfo('Downloading data and OSM file.')
 
-        url = raw_query['OUTPUT_URL']
         connexion_overpass_api = ConnexionOAPI(url)
         osm_file = connexion_overpass_api.run()
 
         if self.feedback.isCanceled():
             self.feedback.reportError('The algorithm has been canceled during the download.')
-            outputs = {
-                self.OUTPUT_POINTS: None,
-                self.OUTPUT_LINES: None,
-                self.OUTPUT_MULTILINESTRINGS: None,
-                self.OUTPUT_MULTIPOLYGONS: None
-            }
-            return outputs
+            return self.OUTPUT_CANCEL
 
-        self.feedback.setCurrentStep(3)
+        self.feedback.setCurrentStep(2)
         self.feedback.pushInfo('Processing downloaded file.')
 
         out_dir = dirname(self.file) if self.file else None
@@ -216,15 +180,9 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
 
         if self.feedback.isCanceled():
             self.feedback.reportError('The algorithm has been canceled during the parsing.')
-            outputs = {
-                self.OUTPUT_POINTS: None,
-                self.OUTPUT_LINES: None,
-                self.OUTPUT_MULTILINESTRINGS: None,
-                self.OUTPUT_MULTIPOLYGONS: None
-            }
-            return outputs
+            return self.OUTPUT_CANCEL
 
-        self.feedback.setCurrentStep(8)
+        self.feedback.setCurrentStep(7)
         self.feedback.pushInfo('Decorating the requested layers.')
 
         layer_output = []
@@ -261,13 +219,7 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
 
         if self.feedback.isCanceled():
             self.feedback.reportError('The algorithm has been canceled during the post processing.')
-            outputs = {
-                self.OUTPUT_POINTS: None,
-                self.OUTPUT_LINES: None,
-                self.OUTPUT_MULTILINESTRINGS: None,
-                self.OUTPUT_MULTIPOLYGONS: None
-            }
-            return outputs
+            return self.OUTPUT_CANCEL
 
         outputs = {
             self.OUTPUT_POINTS: layer_output[0].id(),
@@ -277,5 +229,231 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
         }
         return outputs
 
-    def process_cancel(self):
-        """Cancel the processing algorithm."""
+
+class DownloadOSMDataRawQuery(DownloadOSMData, BuildRaw):
+    """Run the process of the plugin as an algorithm with a raw query input."""
+
+    @staticmethod
+    def name() -> str:
+        """Return the name of the algorithm."""
+        return 'downloadosmdatarawquery'
+
+    @staticmethod
+    def displayName() -> str:
+        """Return the display name of the algorithm."""
+        return tr('Download OSM data from a raw query')
+
+    def flags(self):
+        """Return the flags."""
+        return DownloadOSMData.flags(self)
+
+    def fetch_based_parameters(self, parameters, context):
+        """Get the parameters."""
+        BuildRaw.fetch_based_parameters(self, parameters, context)
+        DownloadOSMData.fetch_based_parameters(self, parameters, context)
+
+    def processAlgorithm(self, parameters, context, feedback):
+        """Run the algorithm."""
+        self.feedback = QgsProcessingMultiStepFeedback(8, feedback)
+        self.fetch_based_parameters(parameters, context)
+
+        self.feedback.setCurrentStep(0)
+        self.feedback.pushInfo('Building the query.')
+
+        raw_query = processing.run(
+            "quickosm:buildrawquery",
+            {
+                'AREA': self.area,
+                'EXTENT': self.extent,
+                'QUERY': self.query,
+                'SERVER': self.server
+            },
+            feedback=self.feedback
+        )
+        url = raw_query['OUTPUT_URL']
+
+        return self.process_road(context, url)
+
+
+class DownloadOSMDataNotSpatialQuery(DownloadOSMData, BuildQueryNotSpatialAlgorithm):
+    """Run the process of the plugin as an algorithm with a query input."""
+
+    @staticmethod
+    def name() -> str:
+        """Return the name of the algorithm."""
+        return 'downloadosmdatanotspatialquery'
+
+    @staticmethod
+    def displayName() -> str:
+        """Return the display name of the algorithm."""
+        return tr('Download OSM data from a not spatial query')
+
+    def flags(self):
+        """Return the flags."""
+        return DownloadOSMData.flags(self)
+
+    def fetch_based_parameters(self, parameters, context):
+        """Get the parameters."""
+        BuildQueryNotSpatialAlgorithm.fetch_based_parameters(self, parameters, context)
+        DownloadOSMData.fetch_based_parameters(self, parameters, context)
+
+    def processAlgorithm(self, parameters, context, feedback):
+        """Run the algorithm."""
+        self.feedback = QgsProcessingMultiStepFeedback(8, feedback)
+        self.fetch_based_parameters(parameters, context)
+
+        self.feedback.setCurrentStep(0)
+        self.feedback.pushInfo('Building the query.')
+
+        query = processing.run(
+            "quickosm:buildquerybyattributeonly",
+            {
+                'KEY': self.key,
+                'QUERY': self.query,
+                'SERVER': self.server,
+                'VALUE': self.value
+            },
+            feedback=self.feedback
+        )
+        url = query['OUTPUT_URL']
+
+        return self.process_road(context, url)
+
+
+class DownloadOSMDataInAreaQuery(DownloadOSMData, BuildQueryInAreaAlgorithm):
+    """Run the process of the plugin as an algorithm with a query input."""
+
+    @staticmethod
+    def name() -> str:
+        """Return the name of the algorithm."""
+        return 'downloadosmdatainarealquery'
+
+    @staticmethod
+    def displayName() -> str:
+        """Return the display name of the algorithm."""
+        return tr('Download OSM data from query in an area')
+
+    def flags(self):
+        """Return the flags."""
+        return DownloadOSMData.flags(self)
+
+    def fetch_based_parameters(self, parameters, context):
+        """Get the parameters."""
+        BuildQueryInAreaAlgorithm.fetch_based_parameters(self, parameters, context)
+        DownloadOSMData.fetch_based_parameters(self, parameters, context)
+
+    def processAlgorithm(self, parameters, context, feedback):
+        """Run the algorithm."""
+        self.feedback = QgsProcessingMultiStepFeedback(8, feedback)
+        self.fetch_based_parameters(parameters, context)
+
+        self.feedback.setCurrentStep(0)
+        self.feedback.pushInfo('Building the query.')
+
+        query = processing.run(
+            "quickosm:buildqueryinsidearea",
+            {
+                'AREA': self.area,
+                'KEY': self.key,
+                'SERVER': self.server,
+                'TIMEOUT': self.timeout,
+                'VALUE': self.value
+            },
+            feedback=self.feedback
+        )
+        url = query['OUTPUT_URL']
+
+        return self.process_road(context, url)
+
+
+class DownloadOSMDataAroundAreaQuery(DownloadOSMData, BuildQueryAroundAreaAlgorithm):
+    """Run the process of the plugin as an algorithm with a query input."""
+
+    @staticmethod
+    def name() -> str:
+        """Return the name of the algorithm."""
+        return 'downloadosmdataaroundarealquery'
+
+    @staticmethod
+    def displayName() -> str:
+        """Return the display name of the algorithm."""
+        return tr('Download OSM data from a query around an area')
+
+    def flags(self):
+        """Return the flags."""
+        return DownloadOSMData.flags(self)
+
+    def fetch_based_parameters(self, parameters, context):
+        """Get the parameters."""
+        BuildQueryAroundAreaAlgorithm.fetch_based_parameters(self, parameters, context)
+        DownloadOSMData.fetch_based_parameters(self, parameters, context)
+
+    def processAlgorithm(self, parameters, context, feedback):
+        """Run the algorithm."""
+        self.feedback = QgsProcessingMultiStepFeedback(8, feedback)
+        self.fetch_based_parameters(parameters, context)
+
+        self.feedback.setCurrentStep(0)
+        self.feedback.pushInfo('Building the query.')
+
+        query = processing.run(
+            "quickosm:buildqueryaroundarea",
+            {
+                'AREA': self.area,
+                'DISTANCE': self.distance,
+                'KEY': self.key,
+                'SERVER': self.server,
+                'TIMEOUT': self.timeout,
+                'VALUE': self.value
+            },
+            feedback=self.feedback
+        )
+        url = query['OUTPUT_URL']
+
+        return self.process_road(context, url)
+
+
+class DownloadOSMDataExtentQuery(DownloadOSMData, BuildQueryExtentAlgorithm):
+    """Run the process of the plugin as an algorithm with a query input."""
+
+    @staticmethod
+    def name() -> str:
+        """Return the name of the algorithm."""
+        return 'downloadosmdataextentquery'
+
+    @staticmethod
+    def displayName() -> str:
+        """Return the display name of the algorithm."""
+        return tr('Download OSM data from a query in an extent')
+
+    def flags(self):
+        """Return the flags."""
+        return DownloadOSMData.flags(self)
+
+    def fetch_based_parameters(self, parameters, context):
+        """Get the parameters."""
+        BuildQueryExtentAlgorithm.fetch_based_parameters(self, parameters, context)
+        DownloadOSMData.fetch_based_parameters(self, parameters, context)
+
+    def processAlgorithm(self, parameters, context, feedback):
+        """Run the algorithm."""
+        self.feedback = QgsProcessingMultiStepFeedback(8, feedback)
+        self.fetch_based_parameters(parameters, context)
+
+        self.feedback.setCurrentStep(0)
+        self.feedback.pushInfo('Building the query.')
+
+        query = processing.run(
+            "quickosm:buildqueryextent",
+            {
+                'EXTENT': self.extent,
+                'KEY': self.key,
+                'SERVER': self.server,
+                'TIMEOUT': self.timeout,
+                'VALUE': self.value
+            },
+            feedback=self.feedback
+        )
+        url = query['OUTPUT_URL']
+
+        return self.process_road(context, url)

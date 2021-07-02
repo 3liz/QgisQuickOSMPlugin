@@ -31,13 +31,13 @@ class BuildBased(QgisAlgorithm):
         self.feedback = None
         self.area = None
         self.extent = None
-        self.timeout = None
         self.server = None
+        self.timeout = None
 
     def fetch_based_parameters(self, parameters, context):
         """Get the parameters."""
-        self.timeout = self.parameterAsInt(parameters, self.TIMEOUT, context)
         self.server = self.parameterAsString(parameters, self.SERVER, context)
+        self.timeout = self.parameterAsInt(parameters, self.TIMEOUT, context)
 
     def add_top_parameters(self):
         """Set up the parameters."""

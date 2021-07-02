@@ -19,6 +19,10 @@ from QuickOSM.quick_osm_processing.advanced.decorate_output import (
 from QuickOSM.quick_osm_processing.advanced.open_osm_file import OpenOsmFile
 from QuickOSM.quick_osm_processing.advanced.raw_query import RawQueryAlgorithm
 from QuickOSM.quick_osm_processing.quickosm_process import (
+    DownloadOSMDataAroundAreaQuery,
+    DownloadOSMDataExtentQuery,
+    DownloadOSMDataInAreaQuery,
+    DownloadOSMDataNotSpatialQuery,
     DownloadOSMDataRawQuery,
 )
 
@@ -57,3 +61,7 @@ class Provider(QgsProcessingProvider):
         self.addAlgorithm(OpenOsmFile())
         self.addAlgorithm(DownloadOSMDataRawQuery())
         self.addAlgorithm(DecorateLayerAlgorithm())
+        self.addAlgorithm(DownloadOSMDataNotSpatialQuery())
+        self.addAlgorithm(DownloadOSMDataInAreaQuery())
+        self.addAlgorithm(DownloadOSMDataAroundAreaQuery())
+        self.addAlgorithm(DownloadOSMDataExtentQuery())

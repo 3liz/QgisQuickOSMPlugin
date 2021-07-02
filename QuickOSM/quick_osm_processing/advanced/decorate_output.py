@@ -77,7 +77,7 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
     def add_outputs(self):
         """Set up the outputs of the algorithm."""
         output = QgsProcessingOutputVectorLayer(
-            self.OUTPUT_LAYER, self.tr('Output layer')
+            self.OUTPUT_LAYER, tr('Output layer')
         )
         help_string = tr('The layer with metadata, actions and maybe style.')
         if Qgis.QGIS_VERSION_INT >= 31500:
@@ -93,6 +93,7 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
 
     def initAlgorithm(self, config=None):
         """Set up of the algorithm."""
+        _ = config
         self.add_parameters()
         self.add_outputs()
 
@@ -121,6 +122,8 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
                 category = QgsRendererCategory(str(value), symbol, str(value))
                 categories.append(category)
 
+            category = QgsRendererCategory()
+            categories.append(category)
             renderer = QgsCategorizedSymbolRenderer("colour", categories)
             self.layer.setRenderer(renderer)
 

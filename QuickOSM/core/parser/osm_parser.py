@@ -155,7 +155,7 @@ class OsmParser(QObject):
 
             # Get the other_tags
             if self.feedback:
-                self.feedback.setCurrentStep(3 + k)
+                self.feedback.setCurrentStep(2 + k)
                 self.feedback.pushInfo('Explode the other_tags field in layer {}.'.format(layer))
                 if self.feedback.isCanceled():
                     return None
@@ -181,7 +181,7 @@ class OsmParser(QObject):
             meta = False
             for feature in features:
                 if self.feedback:
-                    self.feedback.setCurrentStep(3)
+                    self.feedback.setCurrentStep(2)
                     if self.feedback.isCanceled():
                         return None
 
@@ -253,6 +253,7 @@ class OsmParser(QObject):
                     {'expression': '\"osm_id\"', 'length': 0, 'name': 'osm_id', 'precision': 0, 'type': 10},
                 ]
                 begin = 1
+                nb_metadata = 5
                 if layer == 'multipolygons':
                     begin += 1
                 fields_mapping.append({
@@ -260,13 +261,13 @@ class OsmParser(QObject):
                     'name': 'osm_type', 'precision': 0, 'type': 10
                 })
                 if meta:
-                    for name in tags[begin:begin + 5]:
+                    for name in tags[begin:begin + nb_metadata]:
                         fields_mapping.append({
                             'expression': '\"' + name + '\"',
                             'length': 0, 'name': name,
                             'precision': 0, 'type': 10
                         })
-                begin += 5
+                begin += nb_metadata
 
                 for key in self.__key:
                     if key in tags:
