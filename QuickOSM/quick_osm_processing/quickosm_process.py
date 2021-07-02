@@ -15,16 +15,13 @@ from qgis.core import (
     QgsProcessingParameterFileDestination,
     QgsProcessingUtils,
 )
+from qgis.PyQt.QtGui import QIcon
 
 from QuickOSM.core.api.connexion_oapi import ConnexionOAPI
 from QuickOSM.core.parser.osm_parser import OsmParser
 from QuickOSM.definitions.format import Format
 from QuickOSM.qgis_plugin_tools.tools.i18n import tr
-
-__copyright__ = 'Copyright 2021, 3Liz'
-__license__ = 'GPL version 3'
-__email__ = 'info@3liz.org'
-
+from QuickOSM.qgis_plugin_tools.tools.resources import resources_path
 from QuickOSM.quick_osm_processing.advanced.build_query import (
     BuildQueryAroundAreaAlgorithm,
     BuildQueryExtentAlgorithm,
@@ -32,6 +29,10 @@ from QuickOSM.quick_osm_processing.advanced.build_query import (
     BuildQueryNotSpatialAlgorithm,
 )
 from QuickOSM.quick_osm_processing.build_input import BuildRaw
+
+__copyright__ = 'Copyright 2021, 3Liz'
+__license__ = 'GPL version 3'
+__email__ = 'info@3liz.org'
 
 
 class DownloadOSMData(QgisAlgorithm):
@@ -68,6 +69,10 @@ class DownloadOSMData(QgisAlgorithm):
     def shortHelpString(self) -> str:
         """Return an helper for the algorithm."""
         return tr('Fetch the OSM data that match the request.')
+
+    def icon(self):
+        """Return the icon."""
+        return QIcon(resources_path('icons', 'QuickOSM.svg'))
 
     def flags(self):
         """Return the flags."""
