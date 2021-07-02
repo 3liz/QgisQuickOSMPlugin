@@ -130,7 +130,7 @@ class OsmParser(QObject):
             return layers
 
         # Foreach layers
-        for layer in self.__layers:
+        for k, layer in enumerate(self.__layers):
             self.signalText.emit(tr('Parsing layer : {layer}').format(layer=layer))
             layers[layer] = {}
 
@@ -155,7 +155,10 @@ class OsmParser(QObject):
 
             # Get the other_tags
             if self.feedback:
+                self.feedback.setCurrentStep(3 + k)
                 self.feedback.pushInfo('Explode the other_tags field in layer {}.'.format(layer))
+                if self.feedback.isCanceled():
+                    return None
             layers[layer]['vector_layer'] = processing.run(
                 "native:explodehstorefield", {
                     'INPUT': layers[layer]['vectorLayer'],
@@ -177,6 +180,11 @@ class OsmParser(QObject):
             features = layers[layer]['vector_layer'].getFeatures()
             meta = False
             for feature in features:
+                if self.feedback:
+                    self.feedback.setCurrentStep(3)
+                    if self.feedback.isCanceled():
+                        return None
+
                 layers[layer]['featureCount'] += 1
                 attributes = feature.attributes()
                 index_version = fields.indexOf('osm_version')

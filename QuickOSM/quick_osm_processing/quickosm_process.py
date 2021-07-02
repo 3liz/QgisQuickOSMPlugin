@@ -1,5 +1,5 @@
 """Run the process of the plugin as an algorithm."""
-from os.path import dirname, basename
+from os.path import basename, dirname
 
 import processing
 
@@ -142,13 +142,13 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
 
     def processAlgorithm(self, parameters, context, feedback):
         """Run the algorithm."""
-        self.feedback = QgsProcessingMultiStepFeedback(5, feedback)
+        self.feedback = QgsProcessingMultiStepFeedback(9, feedback)
         self.fetch_based_parameters(parameters, context)
 
         self.feedback.setCurrentStep(0)
 
         if self.feedback.isCanceled():
-            self.feedback.pushDebug('Aie canceled')
+            self.feedback.reportError('The algorithm has been canceled.')
             outputs = {
                 self.OUTPUT_POINTS: None,
                 self.OUTPUT_LINES: None,
@@ -171,12 +171,32 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
             feedback=self.feedback
         )
 
+        if self.feedback.isCanceled():
+            self.feedback.reportError('The algorithm has been canceled during the building of the url.')
+            outputs = {
+                self.OUTPUT_POINTS: None,
+                self.OUTPUT_LINES: None,
+                self.OUTPUT_MULTILINESTRINGS: None,
+                self.OUTPUT_MULTIPOLYGONS: None
+            }
+            return outputs
+
         self.feedback.setCurrentStep(2)
         self.feedback.pushInfo('Downloading data and OSM file.')
 
         url = raw_query['OUTPUT_URL']
         connexion_overpass_api = ConnexionOAPI(url)
         osm_file = connexion_overpass_api.run()
+
+        if self.feedback.isCanceled():
+            self.feedback.reportError('The algorithm has been canceled during the download.')
+            outputs = {
+                self.OUTPUT_POINTS: None,
+                self.OUTPUT_LINES: None,
+                self.OUTPUT_MULTILINESTRINGS: None,
+                self.OUTPUT_MULTIPOLYGONS: None
+            }
+            return outputs
 
         self.feedback.setCurrentStep(3)
         self.feedback.pushInfo('Processing downloaded file.')
@@ -194,7 +214,17 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
 
         layers = osm_parser.processing_parse()
 
-        self.feedback.setCurrentStep(4)
+        if self.feedback.isCanceled():
+            self.feedback.reportError('The algorithm has been canceled during the parsing.')
+            outputs = {
+                self.OUTPUT_POINTS: None,
+                self.OUTPUT_LINES: None,
+                self.OUTPUT_MULTILINESTRINGS: None,
+                self.OUTPUT_MULTIPOLYGONS: None
+            }
+            return outputs
+
+        self.feedback.setCurrentStep(8)
         self.feedback.pushInfo('Decorating the requested layers.')
 
         layer_output = []
@@ -229,6 +259,16 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
                 )
             )
 
+        if self.feedback.isCanceled():
+            self.feedback.reportError('The algorithm has been canceled during the post processing.')
+            outputs = {
+                self.OUTPUT_POINTS: None,
+                self.OUTPUT_LINES: None,
+                self.OUTPUT_MULTILINESTRINGS: None,
+                self.OUTPUT_MULTIPOLYGONS: None
+            }
+            return outputs
+
         outputs = {
             self.OUTPUT_POINTS: layer_output[0].id(),
             self.OUTPUT_LINES: layer_output[1].id(),
@@ -236,3 +276,6 @@ class DownloadOSMDataRawQuery(BuildRaw, DownloadOSMData):
             self.OUTPUT_MULTIPOLYGONS: layer_output[3].id(),
         }
         return outputs
+
+    def process_cancel(self):
+        """Cancel the processing algorithm."""
