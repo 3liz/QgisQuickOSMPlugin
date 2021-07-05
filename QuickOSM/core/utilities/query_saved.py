@@ -45,18 +45,19 @@ class QueryManagement:
             json.dump(data, json_file)
 
     @staticmethod
-    def add_query_bookmark(query: str, name: str):
+    def add_bookmark(query: str, name: str, description: str):
         """Add a new query in the bookmark folder"""
         bookmark_folder = query_bookmark()
         files = listdir(bookmark_folder)
         nb_files = len(files)
 
-        final_name = name if name != "OsmQuery" else 'bookmark_{}.json'.format(nb_files)
+        final_name = name + '.json' if name != "OsmQuery" else 'bookmark_{}.json'.format(nb_files)
 
         new_file = join(bookmark_folder, final_name)
 
         data = {
             'query': [query],
+            'description': [description],
             'name': name
         }
 
@@ -64,7 +65,7 @@ class QueryManagement:
             json.dump(data, json_file)
 
     @staticmethod
-    def remove_query_bookmark(name: str):
+    def remove_bookmark(name: str):
         """Remove a bookmark query"""
         bookmark_folder = query_bookmark()
 
@@ -86,9 +87,10 @@ class QueryManagement:
 
         file = join(bookmark_folder, name + '.json')
 
-        with open(file, 'w', encoding='utf8') as json_file:
+        with open(file, encoding='utf8') as json_file:
             data = json.load(json_file)
-            data['query'].append(query)
+        data['query'].append(query)
+        with open(file, 'w', encoding='utf8') as json_file:
             json.dump(data, json_file)
 
     def rename_bookmark(self, former_name: str, new_name: str):
@@ -104,4 +106,4 @@ class QueryManagement:
         with open(new_file, 'w', encoding='utf8') as new_json_file:
             json.dump(data, new_json_file)
 
-        self.remove_query_bookmark(former_name)
+        self.remove_bookmark(former_name)

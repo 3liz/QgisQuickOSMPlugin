@@ -23,6 +23,7 @@ from QuickOSM.core.api.connexion_oapi import ConnexionOAPI
 from QuickOSM.core.parser.osm_parser import OsmParser
 from QuickOSM.core.query_factory import QueryFactory
 from QuickOSM.core.query_preparation import QueryPreparation
+from QuickOSM.core.utilities.query_saved import QueryManagement
 from QuickOSM.core.utilities.tools import get_setting
 from QuickOSM.definitions.format import Format
 from QuickOSM.definitions.osm import (
@@ -126,7 +127,6 @@ def open_file(
                 if "colour" in item['tags']:
                     index = item['tags'].index('colour')
                     colors = new_layer.uniqueValues(index)
-                    LOGGER.debug('colour: {}'.format(colors))
                     categories = []
                     for value in colors:
                         if layer in ['lines', 'multilinestrings']:
@@ -202,6 +202,9 @@ def process_query(
         white_list_values: dict = None,
         config_outputs: dict = None) -> int:
     """execute a query and send the result file to open_file."""
+    # Save the query in the historic
+    q_manage = QueryManagement()
+    q_manage.write_query_historic(query, layer_name)
 
     # Prepare outputs
     dialog.set_progress_text(tr('Prepare outputs'))
@@ -249,6 +252,7 @@ def process_quick_query(
         output_directory: str = None,
         output_format: Format = None,
         prefix_file: str = None,
+        layer_name: str = None,
         output_geometry_types: list = None) -> int:
     """
     Generate a query and send it to process_query.
@@ -268,22 +272,6 @@ def process_quick_query(
     query = query_factory.make(QueryLanguage.OQL)
     LOGGER.info(query_factory.friendly_message())
 
-    # Generate layer name as following (if defined)
-    if not key:
-        key = tr('allKeys')
-    distance_string = None
-    if distance:
-        distance_string = '{}'.format(distance)
-    if isinstance(key, list):
-        expected_name = []
-        for k in range(len(key)):
-            expected_name.append(key[k])
-            expected_name.append(value[k])
-        expected_name.append(area)
-        expected_name.append(distance_string)
-    else:
-        expected_name = [key, value, area, distance_string]
-    layer_name = '_'.join([f for f in expected_name if f])
     LOGGER.info('Query: {}'.format(layer_name))
 
     # Call process_query with the new query

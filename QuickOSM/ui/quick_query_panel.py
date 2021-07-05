@@ -1,9 +1,10 @@
 """Panel OSM base class."""
-
+import json
 import logging
 import os
 
 from functools import partial
+from os.path import join
 
 from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import Qt
@@ -17,6 +18,8 @@ from qgis.PyQt.QtWidgets import (
     QListWidgetItem,
     QMenu,
     QPushButton,
+    QGroupBox,
+    QVBoxLayout,
 )
 
 from QuickOSM.core.exceptions import OsmObjectsException, QuickOsmException
@@ -27,6 +30,8 @@ from QuickOSM.core.utilities.completer_free import (
     DiacriticFreeCompleter,
     DiactricFreeStringListModel,
 )
+from QuickOSM.core.utilities.query_saved import QueryManagement
+from QuickOSM.core.utilities.tools import query_bookmark
 from QuickOSM.core.utilities.utilities_qgis import open_plugin_documentation
 from QuickOSM.definitions.gui import Panels
 from QuickOSM.definitions.osm import (
@@ -153,6 +158,8 @@ class QuickQueryPanel(BaseOverpassPanel):
 
         self.dialog.line_file_prefix_qq.setDisabled(True)
 
+        self.dialog.save_query.clicked.connect(self.save_query)
+
         self.dialog.button_show_query.setMenu(QMenu())
 
         self.dialog.action_oql_qq.triggered.connect(self.query_language_oql)
@@ -179,6 +186,8 @@ class QuickQueryPanel(BaseOverpassPanel):
         self.query_type_updated()
         self.init_nominatim_autofill()
         self.update_friendly()
+
+        self.update_bookmark_view()
 
     def prepare_button(self) -> (QPushButton, QPushButton, QPushButton):
         add_row = QPushButton()
@@ -463,7 +472,66 @@ class QuickQueryPanel(BaseOverpassPanel):
         properties['distance'] = self.dialog.spin_place_qq.value()
         if properties['query_type'] != QueryType.AroundArea:
             properties['distance'] = None
+
+        distance_string = None
+        if properties['distance']:
+            distance_string = '{}'.format(properties['distance'])
+        if isinstance(properties['key'], list):
+            expected_name = []
+            for k in range(len(properties['key'])):
+                expected_name.append(properties['key'][k])
+                expected_name.append(properties['value'][k])
+            expected_name.append(properties['place'])
+            expected_name.append(distance_string)
+        elif not properties['key']:
+            key = tr('allKeys')
+            expected_name = [key, properties['value'], properties['place'], distance_string]
+        else:
+            expected_name = [properties['key'], properties['value'], properties['place'], distance_string]
+        properties['layer_name'] = '_'.join([f for f in expected_name if f])
+
         return properties
+
+    def save_query(self):
+        """Save a query in bookmark."""
+        properties = self.gather_values()
+
+        # Make the query
+        query_factory = QueryFactory(
+            type_multi_request=properties['type_multi_request'],
+            query_type=properties['query_type'],
+            key=properties['key'],
+            value=properties['value'],
+            area=properties['place'],
+            around_distance=properties['distance'],
+            osm_objects=properties['osm_objects'],
+            timeout=properties['timeout'],
+            print_mode=properties['metadata']
+        )
+        query = query_factory.make(QueryLanguage.OQL)
+
+        q_manage = QueryManagement()
+        q_manage.add_bookmark(query, properties['layer_name'], query_factory.friendly_message())
+
+    def update_bookmark_view(self):
+        """Update the bookmarks displayed."""
+        box = self.dialog.bookmark
+        vbox = QVBoxLayout()
+        bookmark_folder = query_bookmark()
+        files = os.listdir(bookmark_folder)
+
+        for file in files:
+            name = os.path.basename(file[:-5])
+            file_path = join(bookmark_folder, file)
+            with open(file_path, encoding='utf8') as json_file:
+                data = json.load(json_file)
+            message = '\\n'.join(data['description'])
+
+            item = QListWidgetItem(name)
+            item.setToolTip(message)
+            self.dialog.listWidget.addItem(item)
+
+        box.setLayout(vbox)
 
     def _run(self):
         """Process for running the query."""
@@ -484,6 +552,7 @@ class QuickQueryPanel(BaseOverpassPanel):
             output_directory=properties['output_directory'],
             output_format=properties['output_format'],
             prefix_file=properties['prefix_file'],
+            layer_name=properties['layer_name'],
             output_geometry_types=properties['outputs'])
         self.end_query(num_layers)
 
