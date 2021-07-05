@@ -11,7 +11,6 @@ from qgis.core import (
     QgsProcessingContext,
     QgsProcessingMultiStepFeedback,
     QgsProcessingOutputVectorLayer,
-    QgsProcessingParameterDefinition,
     QgsProcessingParameterFileDestination,
     QgsProcessingUtils,
 )
@@ -27,6 +26,9 @@ from QuickOSM.quick_osm_processing.advanced.build_query import (
     BuildQueryExtentAlgorithm,
     BuildQueryInAreaAlgorithm,
     BuildQueryNotSpatialAlgorithm,
+)
+from QuickOSM.quick_osm_processing.advanced.decorate_output import (
+    SetColoringPostProcessor,
 )
 from QuickOSM.quick_osm_processing.build_input import BuildRaw
 
@@ -88,7 +90,6 @@ class DownloadOSMData(QgisAlgorithm):
             self.FILE, tr('Output file'),
             optional=True)
         param.setFileFilter('*.gpkg')
-        param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
         help_string = tr('Path where the file will be download.')
         if Qgis.QGIS_VERSION_INT >= 31500:
             param.setHelp(help_string)
@@ -206,21 +207,26 @@ class DownloadOSMData(QgisAlgorithm):
                 },
                 feedback=self.feedback
             )
-
             context.temporaryLayerStore().addMapLayer(layers[layer]['vector_layer'])
             layer_output.append(
                 QgsProcessingUtils.mapLayerFromString(
                     layers[layer]['vector_layer'].id(), context, True
                 )
             )
-            context.addLayerToLoadOnCompletion(
-                layers[layer]['vector_layer'].id(),
-                QgsProcessingContext.LayerDetails(
+            if 'tags' in layers[layer]:
+                layer_details = QgsProcessingContext.LayerDetails(
                     'OSMQuery_' + layer,
                     context.project(),
                     OUTPUT[layer]
                 )
-            )
+                if 'colour' in layers[layer]['tags'] and False:
+                    layer_details.setPostProcessor(
+                        SetColoringPostProcessor.create(layers[layer]['tags'])
+                    )
+                context.addLayerToLoadOnCompletion(
+                    layers[layer]['vector_layer'].id(),
+                    layer_details
+                )
 
         if self.feedback.isCanceled():
             self.feedback.reportError('The algorithm has been canceled during the post processing.')

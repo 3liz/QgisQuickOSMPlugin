@@ -6,6 +6,7 @@ from qgis.core import (
     QgsCategorizedSymbolRenderer,
     QgsLayerMetadata,
     QgsProcessingAlgorithm,
+    QgsProcessingLayerPostProcessorInterface,
     QgsProcessingOutputVectorLayer,
     QgsProcessingParameterVectorLayer,
     QgsRendererCategory,
@@ -103,30 +104,6 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
         self.fetch_based_parameters(parameters, context)
 
         fields = self.layer.fields().names()
-        layer_type = self.layer.wkbType()
-        if "colour" in fields:
-            self.feedback.pushInfo('Creating the style from OSM data "colour".')
-            index = fields.index('colour')
-            colors = self.layer.uniqueValues(index)
-            categories = []
-            for value in colors:
-                if layer_type in ['lines', 'multilinestrings']:
-                    symbol = QgsSymbol.defaultSymbol(QgsWkbTypes.LineGeometry)
-                elif layer_type == "points":
-                    symbol = QgsSymbol.defaultSymbol(QgsWkbTypes.PointGeometry)
-                elif layer_type == "multipolygons":
-                    symbol = QgsSymbol.defaultSymbol(QgsWkbTypes.PolygonGeometry)
-                else:
-                    break
-                symbol.setColor(QColor(value))
-                category = QgsRendererCategory(str(value), symbol, str(value))
-                categories.append(category)
-
-            category = QgsRendererCategory()
-            categories.append(category)
-            renderer = QgsCategorizedSymbolRenderer("colour", categories)
-            self.layer.setRenderer(renderer)
-
         self.feedback.pushInfo('Set up the QuickOSM actions on the layer.')
         actions.add_actions(self.layer, fields)
 
@@ -140,3 +117,48 @@ class DecorateLayerAlgorithm(QgisAlgorithm):
             self.OUTPUT_LAYER: self.layer,
         }
         return outputs
+
+
+class SetColoringPostProcessor(QgsProcessingLayerPostProcessorInterface):
+    instance = None
+    fields = []
+    layer_type_dict = {
+        'points': 1,
+        'lines': 2,
+        'multilinestrings': 5,
+        'multipolygons': 6
+    }
+
+    def postProcessLayer(self, layer, context, feedback):
+        _ = context
+
+        layer_type = layer.wkbType()
+        feedback.pushInfo('Creating the style from OSM data "colour".')
+        index = self.fields.index('colour')
+        colors = layer.uniqueValues(index)
+        categories = []
+        for value in colors:
+            if layer_type in [self.layer_type_dict['lines'], self.layer_type_dict['multilinestrings']]:
+                symbol = QgsSymbol.defaultSymbol(QgsWkbTypes.LineGeometry)
+            elif layer_type == self.layer_type_dict['point']:
+                symbol = QgsSymbol.defaultSymbol(QgsWkbTypes.PointGeometry)
+            elif layer_type == self.layer_type_dict['multipolygons']:
+                symbol = QgsSymbol.defaultSymbol(QgsWkbTypes.PolygonGeometry)
+            else:
+                break
+            symbol.setColor(QColor(str(value)))
+            category = QgsRendererCategory(str(value), symbol, str(value))
+            categories.append(category)
+
+        category = QgsRendererCategory()
+        categories.append(category)
+
+        renderer = QgsCategorizedSymbolRenderer("colour", categories)
+        layer.setRenderer(renderer)
+
+    # Hack to work around sip bug!
+    @staticmethod
+    def create(fields) -> 'SetColoringPostProcessor':
+        SetColoringPostProcessor.instance = SetColoringPostProcessor()
+        SetColoringPostProcessor.fields = fields
+        return SetColoringPostProcessor.instance
