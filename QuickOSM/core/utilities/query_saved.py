@@ -2,10 +2,16 @@
 import json
 import logging
 import re
-from os import listdir, remove, rename, mkdir
-from os.path import join
 
-from QuickOSM.core.utilities.tools import query_historic, query_bookmark
+from os import listdir, remove, rename
+from os.path import join
+from typing import List, Union
+
+from qgis.core import QgsRectangle
+
+from QuickOSM.core.utilities.json_encoder import EnumEncoder, as_enum
+from QuickOSM.core.utilities.tools import query_bookmark, query_historic
+from QuickOSM.definitions.format import Format
 
 __copyright__ = 'Copyright 2021, 3Liz'
 __license__ = 'GPL version 3'
@@ -18,8 +24,36 @@ LOGGER = logging.getLogger('QuickOSM')
 class QueryManagement:
     """Manage the saved query in history or bookmark."""
 
-    @staticmethod
-    def write_query_historic(query: str, name: str):
+    def __init__(
+            self,
+            query: Union[str, List[str]] = '',
+            name: str = '',
+            description: Union[str, List[str]] = '',
+            area: Union[str, List[str]] = None,
+            bbox: QgsRectangle = None,
+            output_geometry_types: list = None,
+            white_list_column: dict = None,
+            output_directory: str = None,
+            output_format: Format = None
+    ):
+        """Constructor"""
+        if isinstance(query, str):
+            self.query = [query]
+        else:
+            self.query = query
+        self.name = name
+        if isinstance(description, str):
+            self.description = [description]
+        else:
+            self.description = description
+        self.area = area
+        self.bbox = bbox
+        self.output_geom_type = output_geometry_types
+        self.white_list = white_list_column
+        self.output_directory = output_directory
+        self.output_format = output_format
+
+    def write_query_historic(self):
         """Write new query in the history folder"""
         history_folder = query_historic()
         files = listdir(history_folder)
@@ -36,16 +70,9 @@ class QueryManagement:
         else:
             new_file = join(history_folder, 'query_saved_{}.json'.format(nb_files))
 
-        data = {
-            'query': query,
-            'name': name
-        }
+        self.write_json(new_file)
 
-        with open(new_file, 'w', encoding='utf8') as json_file:
-            json.dump(data, json_file)
-
-    @staticmethod
-    def add_bookmark(query: str, name: str, description: str):
+    def add_bookmark(self, name: str):
         """Add a new query in the bookmark folder"""
         bookmark_folder = query_bookmark()
         files = listdir(bookmark_folder)
@@ -54,15 +81,25 @@ class QueryManagement:
         final_name = name + '.json' if name != "OsmQuery" else 'bookmark_{}.json'.format(nb_files)
 
         new_file = join(bookmark_folder, final_name)
+        self.write_json(new_file)
 
+    def write_json(self, file: str):
+        """Write the saved file in json"""
         data = {
-            'query': [query],
-            'description': [description],
-            'name': name
+            'query': [self.query],
+            'description': self.description,
+            'file_name': self.name,
+            'query_name': [self.name],
+            'area': self.area,
+            'bbox': self.bbox,
+            'output_geom_type': self.output_geom_type,
+            'white_list_column': self.white_list,
+            'output_directory': self.output_directory,
+            'output_format': self.output_format
         }
 
-        with open(new_file, 'w', encoding='utf8') as json_file:
-            json.dump(data, json_file)
+        with open(file, 'w', encoding='utf8') as json_file:
+            json.dump(data, json_file, cls=EnumEncoder)
 
     @staticmethod
     def remove_bookmark(name: str):
@@ -88,10 +125,10 @@ class QueryManagement:
         file = join(bookmark_folder, name + '.json')
 
         with open(file, encoding='utf8') as json_file:
-            data = json.load(json_file)
+            data = json.load(json_file, object_hook=as_enum)
         data['query'].append(query)
         with open(file, 'w', encoding='utf8') as json_file:
-            json.dump(data, json_file)
+            json.dump(data, json_file, cls=EnumEncoder)
 
     def rename_bookmark(self, former_name: str, new_name: str):
         """Rename a bookmark query"""
@@ -101,9 +138,9 @@ class QueryManagement:
         new_file = join(bookmark_folder, new_name + '.json')
 
         with open(former_file, encoding='utf8') as json_file:
-            data = json.load(json_file)
+            data = json.load(json_file, object_hook=as_enum)
             data['name'] = new_name
         with open(new_file, 'w', encoding='utf8') as new_json_file:
-            json.dump(data, new_json_file)
+            json.dump(data, new_json_file, cls=EnumEncoder)
 
         self.remove_bookmark(former_name)

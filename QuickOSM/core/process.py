@@ -191,6 +191,7 @@ def reload_query(
 def process_query(
         dialog: QDialog = None,
         query: str = None,
+        description: str = None,
         area: Union[str, List[str]] = None,
         key: Union[str, List[str]] = None,
         bbox: QgsRectangle = None,
@@ -203,8 +204,16 @@ def process_query(
         config_outputs: dict = None) -> int:
     """execute a query and send the result file to open_file."""
     # Save the query in the historic
-    q_manage = QueryManagement()
-    q_manage.write_query_historic(query, layer_name)
+    q_manage = QueryManagement(
+        query=query,
+        name=prefix_file if prefix_file else layer_name,
+        description=description,
+        area=area,
+        bbox=bbox,
+        output_geometry_types=output_geometry_types,
+        white_list_column=white_list_values
+    )
+    q_manage.write_query_historic()
 
     # Prepare outputs
     dialog.set_progress_text(tr('Prepare outputs'))
@@ -270,7 +279,8 @@ def process_quick_query(
         print_mode=metadata
     )
     query = query_factory.make(QueryLanguage.OQL)
-    LOGGER.info(query_factory.friendly_message())
+    description = query_factory.friendly_message()
+    LOGGER.info(description)
 
     LOGGER.info('Query: {}'.format(layer_name))
 
@@ -278,6 +288,7 @@ def process_quick_query(
     return process_query(
         dialog=dialog,
         query=query,
+        description=description,
         key=key,
         area=area,
         bbox=bbox,

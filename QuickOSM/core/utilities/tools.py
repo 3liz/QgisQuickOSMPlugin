@@ -5,7 +5,7 @@ import platform
 import sys
 
 from os import mkdir
-from os.path import abspath, isfile, join, isdir
+from os.path import abspath, isdir, isfile, join
 
 from qgis.core import QgsApplication, QgsSettings
 from qgis.PyQt.QtCore import QDir

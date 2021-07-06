@@ -14,24 +14,28 @@ from qgis.PyQt.QtWidgets import (
     QCompleter,
     QDialog,
     QDialogButtonBox,
+    QGroupBox,
+    QHBoxLayout,
     QHeaderView,
+    QLabel,
     QListWidgetItem,
     QMenu,
     QPushButton,
-    QGroupBox,
+    QSizePolicy,
     QVBoxLayout,
 )
 
 from QuickOSM.core.exceptions import OsmObjectsException, QuickOsmException
 from QuickOSM.core.parser.preset_parser import PresetsParser
-from QuickOSM.core.process import process_quick_query
+from QuickOSM.core.process import process_query, process_quick_query
 from QuickOSM.core.query_factory import QueryFactory
 from QuickOSM.core.utilities.completer_free import (
     DiacriticFreeCompleter,
     DiactricFreeStringListModel,
 )
+from QuickOSM.core.utilities.json_encoder import as_enum
 from QuickOSM.core.utilities.query_saved import QueryManagement
-from QuickOSM.core.utilities.tools import query_bookmark
+from QuickOSM.core.utilities.tools import query_bookmark, query_historic
 from QuickOSM.core.utilities.utilities_qgis import open_plugin_documentation
 from QuickOSM.definitions.gui import Panels
 from QuickOSM.definitions.osm import (
@@ -188,6 +192,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         self.update_friendly()
 
         self.update_bookmark_view()
+        self.update_history_view()
 
     def prepare_button(self) -> (QPushButton, QPushButton, QPushButton):
         add_row = QPushButton()
@@ -509,29 +514,158 @@ class QuickQueryPanel(BaseOverpassPanel):
             print_mode=properties['metadata']
         )
         query = query_factory.make(QueryLanguage.OQL)
+        description = query_factory.friendly_message()
 
-        q_manage = QueryManagement()
-        q_manage.add_bookmark(query, properties['layer_name'], query_factory.friendly_message())
+        q_manage = QueryManagement(
+            query=query,
+            name=properties['layer_name'],
+            description=description,
+            area=properties['place'],
+            bbox=properties['bbox'],
+            output_geometry_types=properties['outputs'],
+            output_directory=properties['output_directory'],
+            output_format=properties['output_format']
+        )
+        q_manage.add_bookmark(properties['layer_name'])
+
+        self.update_bookmark_view()
+
+    def save_history_bookmark(self, data: dict):
+        """Save an query from history to bookmark."""
+
+        q_manage = QueryManagement(
+            query=data['query'],
+            name=data['file_name'],
+            description=data['description'],
+            area=data['area'],
+            bbox=data['bbox'],
+            output_geometry_types=data['output_geom_type'],
+            white_list_column=data['white_list_column'],
+            output_directory=data['output_directory'],
+            output_format=data['output_format']
+        )
+        q_manage.add_bookmark(data['file_name'])
+
+        self.update_bookmark_view()
+
+    def update_history_view(self):
+        """Update the history view."""
+        historic_folder = query_historic()
+        files = os.listdir(historic_folder)
+
+        self.dialog.list_historic.clear()
+
+        for file in files:
+            file_path = join(historic_folder, file)
+            with open(file_path, encoding='utf8') as json_file:
+                data = json.load(json_file, object_hook=as_enum)
+            name = data['query_name'][0]
+
+            item = QListWidgetItem(self.dialog.list_historic)
+            self.dialog.list_historic.addItem(item)
+
+            groupbox = QGroupBox(name)
+            groupbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            hbox = QHBoxLayout()
+            vbox = QVBoxLayout()
+            for label in data['description']:
+                if not label:
+                    label = tr('No description')
+                real_label = QLabel(label)
+                real_label.setWordWrap(True)
+                vbox.addWidget(real_label)
+            hbox.addItem(vbox)
+            button_run = QPushButton()
+            button_save = QPushButton()
+            button_run.setIcon(QIcon(QgsApplication.iconPath("mActionStart.svg")))
+            button_save.setIcon(QIcon(QgsApplication.iconPath("mActionFileSave.svg")))
+            button_run.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button_save.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            hbox.addWidget(button_run)
+            hbox.addWidget(button_save)
+            groupbox.setLayout(hbox)
+
+            # Actions on click
+            run = partial(self.run_saved_query, data)
+            button_run.clicked.connect(run)
+            save = partial(self.save_history_bookmark, data)
+            button_save.clicked.connect(save)
+
+            item.setSizeHint(groupbox.minimumSizeHint())
+            self.dialog.list_historic.setItemWidget(item, groupbox)
 
     def update_bookmark_view(self):
         """Update the bookmarks displayed."""
-        box = self.dialog.bookmark
-        vbox = QVBoxLayout()
         bookmark_folder = query_bookmark()
         files = os.listdir(bookmark_folder)
 
+        self.dialog.list_bookmark.clear()
+
         for file in files:
-            name = os.path.basename(file[:-5])
             file_path = join(bookmark_folder, file)
             with open(file_path, encoding='utf8') as json_file:
-                data = json.load(json_file)
-            message = '\\n'.join(data['description'])
+                data = json.load(json_file, object_hook=as_enum)
+            name = data['file_name']
 
-            item = QListWidgetItem(name)
-            item.setToolTip(message)
-            self.dialog.listWidget.addItem(item)
+            item = QListWidgetItem(self.dialog.list_bookmark)
+            self.dialog.list_bookmark.addItem(item)
 
-        box.setLayout(vbox)
+            groupbox = QGroupBox(name)
+            groupbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            hbox = QHBoxLayout()
+            vbox = QVBoxLayout()
+            for label in data['description']:
+                real_label = QLabel(label)
+                real_label.setWordWrap(True)
+                vbox.addWidget(real_label)
+            hbox.addItem(vbox)
+            button_run = QPushButton()
+            button_edit = QPushButton()
+            button_remove = QPushButton()
+            button_run.setIcon(QIcon(QgsApplication.iconPath("mActionStart.svg")))
+            button_edit.setIcon(QIcon(QgsApplication.iconPath("mActionToggleEditing.svg")))
+            button_remove.setIcon(QIcon(QgsApplication.iconPath('symbologyRemove.svg')))
+            button_run.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button_edit.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button_remove.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            hbox.addWidget(button_run)
+            hbox.addWidget(button_edit)
+            hbox.addWidget(button_remove)
+            groupbox.setLayout(hbox)
+
+            # Actions on click
+            remove = partial(self.remove_bookmark, item, name)
+            button_remove.clicked.connect(remove)
+            run = partial(self.run_saved_query, data)
+            button_run.clicked.connect(run)
+
+            item.setSizeHint(groupbox.minimumSizeHint())
+            self.dialog.list_bookmark.setItemWidget(item, groupbox)
+
+    def remove_bookmark(self, item: QListWidgetItem, name: str):
+        """Remove a bookmark."""
+        index = self.dialog.list_bookmark.row(item)
+        self.dialog.list_bookmark.takeItem(index)
+
+        q_manage = QueryManagement()
+        q_manage.remove_bookmark(name)
+
+    def _run_saved_query(self, data: dict):
+        """Run a saved query(ies)."""
+        for k, query in enumerate(data['query']):
+            num_layers = process_query(
+                dialog=self.dialog,
+                query=query,
+                description=data['description'],
+                layer_name=data['query_name'][k],
+                white_list_values=data['white_list_column'],
+                area=data['area'],
+                bbox=data['bbox'],
+                output_geometry_types=data['output_geom_type'],
+                output_format=data['output_format'],
+                output_dir=data['output_directory']
+            )
+            self.end_query(num_layers)
 
     def _run(self):
         """Process for running the query."""
@@ -554,6 +688,7 @@ class QuickQueryPanel(BaseOverpassPanel):
             prefix_file=properties['prefix_file'],
             layer_name=properties['layer_name'],
             output_geometry_types=properties['outputs'])
+        self.update_history_view()
         self.end_query(num_layers)
 
     def show_query(self, output: QueryLanguage):
