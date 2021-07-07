@@ -9,7 +9,7 @@ from typing import List, Union
 
 from qgis.core import QgsRectangle
 
-from QuickOSM.core.utilities.json_encoder import EnumEncoder, as_enum
+from QuickOSM.core.utilities.json_encoder import EnumEncoder
 from QuickOSM.core.utilities.tools import query_bookmark, query_historic
 from QuickOSM.definitions.format import Format
 
@@ -17,6 +17,7 @@ __copyright__ = 'Copyright 2021, 3Liz'
 __license__ = 'GPL version 3'
 __email__ = 'info@3liz.org'
 
+from QuickOSM.definitions.osm import OSM_LAYERS, WHITE_LIST, LayerType
 
 LOGGER = logging.getLogger('QuickOSM')
 
@@ -30,7 +31,7 @@ class QueryManagement:
             name: str = '',
             description: Union[str, List[str]] = '',
             area: Union[str, List[str]] = None,
-            bbox: QgsRectangle = None,
+            bbox: Union[QgsRectangle, List[QgsRectangle]] = None,
             output_geometry_types: list = None,
             white_list_column: dict = None,
             output_directory: str = None,
@@ -41,17 +42,55 @@ class QueryManagement:
             self.query = [query]
         else:
             self.query = query
-        self.name = name
+
+        if isinstance(name, str):
+            self.name = [name]
+        else:
+            self.name = name
+
         if isinstance(description, str):
             self.description = [description]
         else:
             self.description = description
-        self.area = area
-        self.bbox = bbox
-        self.output_geom_type = output_geometry_types
-        self.white_list = white_list_column
-        self.output_directory = output_directory
-        self.output_format = output_format
+
+        if area is None:
+            self.area = ['']
+        elif isinstance(area, str):
+            self.area = [area]
+        else:
+            self.area = area
+
+        if bbox is None:
+            self.bbox = ['']
+        elif isinstance(bbox, QgsRectangle):
+            self.bbox = [bbox]
+        else:
+            self.bbox = bbox
+        LOGGER.debug('Bbox: {}'.format(str(self.bbox)))
+
+        if output_geometry_types is None:
+            self.output_geom_type = [OSM_LAYERS]
+        elif isinstance(output_geometry_types[0], LayerType):
+            self.output_geom_type = [output_geometry_types]
+        else:
+            self.output_geom_type = output_geometry_types
+
+        if white_list_column is None:
+            self.white_list = [WHITE_LIST]
+        elif isinstance(white_list_column, dict):
+            self.white_list = [white_list_column]
+        else:
+            self.white_list = white_list_column
+
+        if isinstance(output_directory, str):
+            self.output_directory = [output_directory]
+        else:
+            self.output_directory = output_directory
+
+        if isinstance(output_format, Format):
+            self.output_format = [output_format]
+        else:
+            self.output_format = output_format
 
     def write_query_historic(self):
         """Write new query in the history folder"""
@@ -86,10 +125,10 @@ class QueryManagement:
     def write_json(self, file: str):
         """Write the saved file in json"""
         data = {
-            'query': [self.query],
+            'query': self.query,
             'description': self.description,
-            'file_name': self.name,
-            'query_name': [self.name],
+            'file_name': self.name[0],
+            'query_name': self.name,
             'area': self.area,
             'bbox': self.bbox,
             'output_geom_type': self.output_geom_type,
@@ -118,29 +157,36 @@ class QueryManagement:
                     rename(former_file, new_file)
 
     @staticmethod
-    def add_query_in_bookmark(query: str, name: str):
+    def add_empty_query_in_bookmark(data: dict) -> dict:
         """Add a query in a bookmark file"""
-        bookmark_folder = query_bookmark()
+        data['query'].append('')
+        data['query_name'].append('')
+        data['area'].append('')
+        data['bbox'].append('')
+        data['output_geom_type'].append(OSM_LAYERS)
+        data['white_list_column'].append(WHITE_LIST)
+        data['output_format'].append(None)
+        data['output_directory'].append(None)
 
-        file = join(bookmark_folder, name + '.json')
+        return data
 
-        with open(file, encoding='utf8') as json_file:
-            data = json.load(json_file, object_hook=as_enum)
-        data['query'].append(query)
-        with open(file, 'w', encoding='utf8') as json_file:
-            json.dump(data, json_file, cls=EnumEncoder)
-
-    def rename_bookmark(self, former_name: str, new_name: str):
+    def rename_bookmark(self, former_name: str, new_name: str, data: dict):
         """Rename a bookmark query"""
         bookmark_folder = query_bookmark()
 
-        former_file = join(bookmark_folder, former_name + '.json')
         new_file = join(bookmark_folder, new_name + '.json')
 
-        with open(former_file, encoding='utf8') as json_file:
-            data = json.load(json_file, object_hook=as_enum)
-            data['name'] = new_name
         with open(new_file, 'w', encoding='utf8') as new_json_file:
             json.dump(data, new_json_file, cls=EnumEncoder)
 
         self.remove_bookmark(former_name)
+
+    @staticmethod
+    def update_bookmark(data: dict):
+        """Rename a bookmark query"""
+        bookmark_folder = query_bookmark()
+
+        bookmark_file = join(bookmark_folder, data['file_name'] + '.json')
+
+        with open(bookmark_file, 'w', encoding='utf8') as json_file:
+            json.dump(data, json_file, cls=EnumEncoder)

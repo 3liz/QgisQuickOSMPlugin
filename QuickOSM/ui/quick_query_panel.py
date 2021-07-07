@@ -47,6 +47,7 @@ from QuickOSM.definitions.osm import (
 from QuickOSM.qgis_plugin_tools.tools.i18n import tr
 from QuickOSM.qgis_plugin_tools.tools.resources import resources_path
 from QuickOSM.ui.base_overpass_panel import BaseOverpassPanel
+from QuickOSM.ui.edit_bookmark import EditBookmark
 from QuickOSM.ui.wizard import Wizard
 
 __copyright__ = 'Copyright 2019, 3Liz'
@@ -555,11 +556,11 @@ class QuickQueryPanel(BaseOverpassPanel):
 
         self.dialog.list_historic.clear()
 
-        for file in files:
+        for file in files[::-1]:
             file_path = join(historic_folder, file)
             with open(file_path, encoding='utf8') as json_file:
                 data = json.load(json_file, object_hook=as_enum)
-            name = data['query_name'][0]
+            name = data['file_name']
 
             item = QListWidgetItem(self.dialog.list_historic)
             self.dialog.list_historic.addItem(item)
@@ -636,11 +637,18 @@ class QuickQueryPanel(BaseOverpassPanel):
             # Actions on click
             remove = partial(self.remove_bookmark, item, name)
             button_remove.clicked.connect(remove)
+            edit = partial(self.edit_bookmark, data)
+            button_edit.clicked.connect(edit)
             run = partial(self.run_saved_query, data)
             button_run.clicked.connect(run)
 
             item.setSizeHint(groupbox.minimumSizeHint())
             self.dialog.list_bookmark.setItemWidget(item, groupbox)
+
+    def edit_bookmark(self, data: dict):
+        """Open a dialog to edit the bookmark"""
+        edit_dialog = EditBookmark(self.dialog, data)
+        edit_dialog.exec()
 
     def remove_bookmark(self, item: QListWidgetItem, name: str):
         """Remove a bookmark."""
@@ -658,13 +666,14 @@ class QuickQueryPanel(BaseOverpassPanel):
                 query=query,
                 description=data['description'],
                 layer_name=data['query_name'][k],
-                white_list_values=data['white_list_column'],
-                area=data['area'],
-                bbox=data['bbox'],
-                output_geometry_types=data['output_geom_type'],
-                output_format=data['output_format'],
-                output_dir=data['output_directory']
+                white_list_values=data['white_list_column'][k],
+                area=data['area'][k],
+                bbox=data['bbox'][k],
+                output_geometry_types=data['output_geom_type'][k],
+                output_format=data['output_format'][k],
+                output_dir=data['output_directory'][k]
             )
+            self.update_history_view()
             self.end_query(num_layers)
 
     def _run(self):

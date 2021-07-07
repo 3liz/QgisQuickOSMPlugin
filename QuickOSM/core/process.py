@@ -27,8 +27,8 @@ from QuickOSM.core.utilities.query_saved import QueryManagement
 from QuickOSM.core.utilities.tools import get_setting
 from QuickOSM.definitions.format import Format
 from QuickOSM.definitions.osm import (
+    OSM_LAYERS,
     LayerType,
-    Osm_Layers,
     OsmType,
     QueryLanguage,
     QueryType,
@@ -68,15 +68,12 @@ def open_file(
     """
 
     if output_geom_types is None:
-        output_geom_types = Osm_Layers
+        output_geom_types = OSM_LAYERS
     # Legacy, waiting to remove the OsmParser for QGIS >= 3.6
     # Change in osm_file_dialog.py L131 too
     output_geom_legacy = [geom.value.lower() for geom in output_geom_types]
     if not white_list_column:
         white_list_column = {}
-    white_list_legacy = (
-        {cols.value.lower(): csv for cols, csv in white_list_column.items()}
-    )
 
     LOGGER.info('The OSM file is: {}'.format(osm_file))
 
@@ -89,7 +86,7 @@ def open_file(
         prefix_file=prefix_file,
         layer_name=layer_name,
         key=key,
-        white_list_column=white_list_legacy)
+        white_list_column=white_list_column)
 
     if dialog:
         osm_parser.signalText.connect(dialog.set_progress_text)
