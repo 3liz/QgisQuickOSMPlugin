@@ -1,11 +1,13 @@
 """Dialog that edit a bookmark"""
+import logging
 
-from qgis.gui import QgsFileWidget
-from qgis.PyQt.QtWidgets import QDialog
+from qgis.core import QgsCoordinateReferenceSystem
+from qgis.gui import QgsExtentWidget, QgsFileWidget
+from qgis.PyQt.QtCore import QPoint, Qt
+from qgis.PyQt.QtWidgets import QDialog, QListWidgetItem, QMenu
 
 from QuickOSM.core.utilities.query_saved import QueryManagement
 from QuickOSM.definitions.format import Format
-from QuickOSM.definitions.gui import Panels
 from QuickOSM.definitions.osm import LayerType
 from QuickOSM.qgis_plugin_tools.tools.i18n import tr
 from QuickOSM.qgis_plugin_tools.tools.resources import load_ui
@@ -15,6 +17,7 @@ __license__ = 'GPL version 3'
 __email__ = 'info@3liz.org'
 
 FORM_CLASS = load_ui('edit_bookmark.ui')
+LOGGER = logging.getLogger('QuickOSM')
 
 
 class EditBookmark(QDialog, FORM_CLASS):
@@ -34,6 +37,13 @@ class EditBookmark(QDialog, FORM_CLASS):
 
         self.button_add.clicked.connect(self.add_query)
         self.list_queries.currentRowChanged.connect(self.change_query)
+        self.list_queries.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list_queries.customContextMenuRequested.connect(self.item_context)
+
+        self.bbox = QgsExtentWidget()
+        self.bbox.setMapCanvas(parent.iface.mapCanvas())
+        self.bbox_layout.addWidget(self.bbox)
+        self.crs = QgsCoordinateReferenceSystem('EPSG:4326')
 
         self.combo_output_format.addItem(
             Format.GeoPackage.value.label, Format.GeoPackage)
@@ -49,7 +59,7 @@ class EditBookmark(QDialog, FORM_CLASS):
         self.output_directory.setStorageMode(
             QgsFileWidget.GetDirectory)
 
-        self.data = data_bookmark
+        self.data = data_bookmark.copy()
         if self.data:
             self.bookmark_name.setText(self.data['file_name'])
             self.description.setPlainText('\\n'.join(self.data['description']))
@@ -59,6 +69,17 @@ class EditBookmark(QDialog, FORM_CLASS):
         self.button_validate.clicked.connect(self.validate)
         self.button_cancel.clicked.connect(self.close)
 
+    def item_context(self, pos: QPoint):
+        """Set context submenu to delete item in the list."""
+        item = self.list_queries.mapToGlobal(pos)
+        submenu = QMenu()
+        delete_action = submenu.addAction(tr('Delete'))
+        right_click_item = submenu.exec_(item)
+        if right_click_item and right_click_item == delete_action:
+            LOGGER.debug('Delete ?')
+            index = self.list_queries.indexAt(pos).row()
+            self.list_queries.takeItem(index)
+
     def data_filling_form(self, num_query: int = 0):
         """Writing the form with data from bookmark"""
 
@@ -66,16 +87,27 @@ class EditBookmark(QDialog, FORM_CLASS):
         self.query.setPlainText(self.data['query'][num_query])
 
         self.area.setText(self.data['area'][num_query])
-        self.bbox.setText(self.data['bbox'][num_query])
+        if self.data['bbox'][num_query]:
+            self.bbox.setOutputExtentFromUser(self.data['bbox'][num_query], self.crs)
+        else:
+            self.bbox.clear()
 
         if LayerType.Points in self.data['output_geom_type'][num_query]:
             self.checkbox_points.setChecked(True)
+        else:
+            self.checkbox_points.setChecked(False)
         if LayerType.Lines in self.data['output_geom_type'][num_query]:
             self.checkbox_lines.setChecked(True)
+        else:
+            self.checkbox_lines.setChecked(False)
         if LayerType.Multilinestrings in self.data['output_geom_type'][num_query]:
             self.checkbox_multilinestrings.setChecked(True)
+        else:
+            self.checkbox_multilinestrings.setChecked(False)
         if LayerType.Multipolygons in self.data['output_geom_type'][num_query]:
             self.checkbox_multipolygons.setChecked(True)
+        else:
+            self.checkbox_multipolygons.setChecked(False)
 
         if self.data['white_list_column'][num_query]['points']:
             self.white_points.setText(self.data['white_list_column'][num_query]['points'])
@@ -91,13 +123,10 @@ class EditBookmark(QDialog, FORM_CLASS):
 
         self.output_directory.setFilePath(self.data['output_directory'][num_query])
 
-    def change_query(self, new: bool = False):
+    def change_query(self):
         """Display the selected query in the view."""
         self.gather_parameters(self.current_query)
-        if new:
-            self.current_query = self.list_queries.count() - 1
-        else:
-            self.current_query = self.list_queries.currentRow()
+        self.current_query = self.list_queries.currentRow()
         self.data_filling_form(self.current_query)
 
     def add_query(self):
@@ -105,10 +134,27 @@ class EditBookmark(QDialog, FORM_CLASS):
         q_manage = QueryManagement()
         self.data = q_manage.add_empty_query_in_bookmark(self.data)
 
-        self.list_queries.addItem(tr('Query ') + str(self.nb_queries + 1))
+        new_query = QListWidgetItem(tr('Query ') + str(self.nb_queries + 1))
+        self.list_queries.addItem(new_query)
         self.nb_queries += 1
 
-        self.change_query(True)
+        self.list_queries.setCurrentItem(new_query)
+
+    def show_extent_canvas(self):
+        """Show the extent in the canvas"""
+        if self.data['bbox'][self.current_query]:
+            self.canvas.setMapTool(self.show_extent_tool)
+            self.show_extent_tool.show_extent(self.data['bbox'][self.current_query])
+
+            self.setVisible(False)
+            self.parent().setVisible(False)
+
+    def end_show_extent(self):
+        """End the show of the extent."""
+        self.canvas.unsetMapTool(self.show_extent_tool)
+
+        self.setVisible(True)
+        self.parent().setVisible(True)
 
     def gather_general_parameters(self):
         """Save the general parameters."""
@@ -121,7 +167,11 @@ class EditBookmark(QDialog, FORM_CLASS):
         self.data['query_name'][num_query] = self.layer_name.text()
         self.data['query'][num_query] = self.query.toPlainText()
         self.data['area'][num_query] = self.area.text()
-        self.data['bbox'][num_query] = self.bbox.text()
+        if self.bbox.outputExtent():
+            self.bbox.setOutputCrs(self.crs)
+            self.data['bbox'][num_query] = self.bbox.outputExtent()
+        else:
+            self.data['bbox'][num_query] = ''
 
         output_geom = []
         if self.checkbox_points.isChecked():
@@ -166,5 +216,4 @@ class EditBookmark(QDialog, FORM_CLASS):
         else:
             q_manage.update_bookmark(self.data)
 
-        self.parent().external_panels[Panels.QuickQuery].update_bookmark_view()
         self.close()

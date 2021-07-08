@@ -648,7 +648,8 @@ class QuickQueryPanel(BaseOverpassPanel):
     def edit_bookmark(self, data: dict):
         """Open a dialog to edit the bookmark"""
         edit_dialog = EditBookmark(self.dialog, data)
-        edit_dialog.exec()
+        edit_dialog.show()
+        self.update_bookmark_view()
 
     def remove_bookmark(self, item: QListWidgetItem, name: str):
         """Remove a bookmark."""

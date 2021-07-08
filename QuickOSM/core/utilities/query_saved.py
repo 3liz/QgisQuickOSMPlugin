@@ -12,12 +12,12 @@ from qgis.core import QgsRectangle
 from QuickOSM.core.utilities.json_encoder import EnumEncoder
 from QuickOSM.core.utilities.tools import query_bookmark, query_historic
 from QuickOSM.definitions.format import Format
+from QuickOSM.definitions.osm import OSM_LAYERS, WHITE_LIST, LayerType
 
 __copyright__ = 'Copyright 2021, 3Liz'
 __license__ = 'GPL version 3'
 __email__ = 'info@3liz.org'
 
-from QuickOSM.definitions.osm import OSM_LAYERS, WHITE_LIST, LayerType
 
 LOGGER = logging.getLogger('QuickOSM')
 
@@ -64,9 +64,10 @@ class QueryManagement:
             self.bbox = ['']
         elif isinstance(bbox, QgsRectangle):
             self.bbox = [bbox]
+        elif isinstance(bbox, str):
+            self.bbox = [bbox]
         else:
             self.bbox = bbox
-        LOGGER.debug('Bbox: {}'.format(str(self.bbox)))
 
         if output_geometry_types is None:
             self.output_geom_type = [OSM_LAYERS]
@@ -82,12 +83,16 @@ class QueryManagement:
         else:
             self.white_list = white_list_column
 
-        if isinstance(output_directory, str):
+        if output_directory is None:
+            self.output_directory = ['']
+        elif isinstance(output_directory, str):
             self.output_directory = [output_directory]
         else:
             self.output_directory = output_directory
 
-        if isinstance(output_format, Format):
+        if output_format is None:
+            self.output_format = ['']
+        elif isinstance(output_format, Format):
             self.output_format = [output_format]
         else:
             self.output_format = output_format
