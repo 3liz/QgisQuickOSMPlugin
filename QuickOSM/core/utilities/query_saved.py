@@ -175,6 +175,20 @@ class QueryManagement:
 
         return data
 
+    @staticmethod
+    def remove_query_in_bookmark(data: dict, num_query: int) -> dict:
+        """Remove a query in a bookmark file."""
+        data['query_name'].pop(num_query)
+        data['query'].pop(num_query)
+        data['area'].pop(num_query)
+        data['bbox'].pop(num_query)
+        data['output_geom_type'].pop(num_query)
+        data['white_list_column'].pop(num_query)
+        data['output_format'].pop(num_query)
+        data['output_directory'].pop(num_query)
+
+        return data
+
     def rename_bookmark(self, former_name: str, new_name: str, data: dict):
         """Rename a bookmark query"""
         bookmark_folder = query_bookmark()

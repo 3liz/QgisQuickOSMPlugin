@@ -8,6 +8,7 @@ from qgis.PyQt.QtWidgets import QDialog, QListWidgetItem, QMenu
 
 from QuickOSM.core.utilities.query_saved import QueryManagement
 from QuickOSM.definitions.format import Format
+from QuickOSM.definitions.gui import Panels
 from QuickOSM.definitions.osm import LayerType
 from QuickOSM.qgis_plugin_tools.tools.i18n import tr
 from QuickOSM.qgis_plugin_tools.tools.resources import load_ui
@@ -76,9 +77,8 @@ class EditBookmark(QDialog, FORM_CLASS):
         delete_action = submenu.addAction(tr('Delete'))
         right_click_item = submenu.exec_(item)
         if right_click_item and right_click_item == delete_action:
-            LOGGER.debug('Delete ?')
             index = self.list_queries.indexAt(pos).row()
-            self.list_queries.takeItem(index)
+            self.delete_query(index)
 
     def data_filling_form(self, num_query: int = 0):
         """Writing the form with data from bookmark"""
@@ -139,6 +139,20 @@ class EditBookmark(QDialog, FORM_CLASS):
         self.nb_queries += 1
 
         self.list_queries.setCurrentItem(new_query)
+
+    def delete_query(self, row: int):
+        """Delete a query in the bookmark"""
+        self.nb_queries -= 1
+
+        self.list_queries.takeItem(row)
+
+        q_manage = QueryManagement()
+        self.data = q_manage.remove_query_in_bookmark(self.data, row)
+
+        for k in range(row, self.nb_queries):
+            self.list_queries.item(k).setText(tr('Query ') + str(k + 1))
+
+        self.current_query = self.list_queries.currentRow()
 
     def show_extent_canvas(self):
         """Show the extent in the canvas"""
@@ -216,4 +230,5 @@ class EditBookmark(QDialog, FORM_CLASS):
         else:
             q_manage.update_bookmark(self.data)
 
+        self.parent().external_panels[Panels.QuickQuery].update_bookmark_view()
         self.close()

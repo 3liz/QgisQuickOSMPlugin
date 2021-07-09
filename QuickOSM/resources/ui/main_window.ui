@@ -130,9 +130,9 @@ QListWidget::item::selected {
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
+          <y>-114</y>
           <width>810</width>
-          <height>946</height>
+          <height>923</height>
          </rect>
         </property>
         <property name="minimumSize">
@@ -386,13 +386,6 @@ QListWidget::item::selected {
                   </layout>
                  </widget>
                  <widget class="QWidget" name="nothingDisplayed"/>
-                </widget>
-               </item>
-               <item row="3" column="0" colspan="2">
-                <widget class="QPushButton" name="save_query">
-                 <property name="text">
-                  <string>Save the query</string>
-                 </property>
                 </widget>
                </item>
               </layout>
@@ -774,6 +767,13 @@ QListWidget::item::selected {
              </item>
              <item>
               <layout class="QHBoxLayout" name="horizontalLayout">
+               <item>
+                <widget class="QPushButton" name="save_query">
+                 <property name="text">
+                  <string>Save query</string>
+                 </property>
+                </widget>
+               </item>
                <item>
                 <widget class="QToolButton" name="button_show_query">
                  <property name="sizePolicy">
@@ -1768,15 +1768,15 @@ QListWidget::item::selected {
  </widget>
  <customwidgets>
   <customwidget>
-   <class>QgsCollapsibleGroupBox</class>
-   <extends>QGroupBox</extends>
-   <header>qgscollapsiblegroupbox.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
    <class>QgsFileWidget</class>
    <extends>QWidget</extends>
    <header>qgsfilewidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>QgsCollapsibleGroupBox</class>
+   <extends>QGroupBox</extends>
+   <header>qgscollapsiblegroupbox.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

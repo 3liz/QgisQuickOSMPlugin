@@ -86,7 +86,7 @@ class SelectExtentTool(QgsMapTool):
         """Transform the coordinates in 4326."""
         if self.start_point is None or self.end_point is None:
             return None
-        elif self.start_point.x() == self.end_point.x() or self.start_point.y() == self.end_point.y():
+        if self.start_point.x() == self.end_point.x() or self.start_point.y() == self.end_point.y():
             return None
 
         # Defining the crs from src and destiny
@@ -151,7 +151,7 @@ class ShowExtent(QgsMapTool):
         """Transform the coordinates in 4326."""
         if self.start_point is None or self.end_point is None:
             return None
-        elif self.start_point.x() == self.end_point.x() or self.start_point.y() == self.end_point.y():
+        if self.start_point.x() == self.end_point.x() or self.start_point.y() == self.end_point.y():
             return None
 
         # Defining the crs from src and destiny

@@ -41,5 +41,5 @@ def as_enum(d):
             float(extent[0]), float(extent[1]),
             float(extent[2]), float(extent[3])
         )
-    else:
-        return d
+
+    return d

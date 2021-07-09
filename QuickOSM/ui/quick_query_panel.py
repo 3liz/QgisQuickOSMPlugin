@@ -1,4 +1,5 @@
 """Panel OSM base class."""
+import datetime
 import json
 import logging
 import os
@@ -196,6 +197,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         self.update_history_view()
 
     def prepare_button(self) -> (QPushButton, QPushButton, QPushButton):
+        """Set up the buttons for a row in the table widget."""
         add_row = QPushButton()
         add_row.setIcon(QIcon(QgsApplication.iconPath('symbologyAdd.svg')))
         add_row.setText('')
@@ -211,6 +213,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         return add_row, remove_row
 
     def prepare_type_multi_request(self) -> QComboBox:
+        """Set up the choice of multi request type for a row in the table widget."""
         type_operation = QComboBox()
         type_operation.setToolTip(
             tr('Set the type of multi-request. '
@@ -223,6 +226,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         return type_operation
 
     def prepare_key_field(self) -> QComboBox:
+        """Set up the key field for a row in the table widget."""
         key_field = QComboBox()
         key_field.setEditable(True)
         key_field.setToolTip(tr('An OSM key to fetch. If empty, all keys will be fetched.'))
@@ -243,6 +247,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         return key_field
 
     def prepare_value_field(self) -> QComboBox:
+        """Set up the value field for a row in the table widget."""
         value_field = QComboBox()
         value_field.setEditable(True)
         value_field.setToolTip(tr('An OSM value to fetch. If empty, all values will be fetched.'))
@@ -256,6 +261,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         return value_field
 
     def add_row_to_table(self, row: int = None):
+        """Add a row in the table widget."""
         # noinspection PyCallingNonCallable
         table = self.dialog.table_keys_values
         nb_row = table.rowCount()
@@ -345,6 +351,7 @@ class QuickQueryPanel(BaseOverpassPanel):
         self.dialog.button_show_query.clicked.connect(query_xml)
 
     def select_preset(self):
+        """Launch the wizard."""
         if self.wizard:
             self.wizard.activateWindow()
         else:
@@ -582,6 +589,8 @@ class QuickQueryPanel(BaseOverpassPanel):
             button_save.setIcon(QIcon(QgsApplication.iconPath("mActionFileSave.svg")))
             button_run.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             button_save.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button_run.setToolTip(tr('Run the query'))
+            button_save.setToolTip(tr('Save this query in bookmark'))
             hbox.addWidget(button_run)
             hbox.addWidget(button_save)
             groupbox.setLayout(hbox)
@@ -629,6 +638,9 @@ class QuickQueryPanel(BaseOverpassPanel):
             button_run.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             button_edit.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             button_remove.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button_run.setToolTip(tr('Run the queries in the bookmark'))
+            button_edit.setToolTip(tr('Edit the bookmark'))
+            button_remove.setToolTip(tr('Delete the bookmark'))
             hbox.addWidget(button_run)
             hbox.addWidget(button_edit)
             hbox.addWidget(button_remove)
@@ -662,11 +674,16 @@ class QuickQueryPanel(BaseOverpassPanel):
     def _run_saved_query(self, data: dict):
         """Run a saved query(ies)."""
         for k, query in enumerate(data['query']):
+            if data['output_directory'][k]:
+                time_str = str(datetime.datetime.now()).replace(' ', '_').replace(':', '-').split('.')[0]
+                name = time_str + '_' + data['query_name'][k]
+            else:
+                name = data['query_name'][k]
             num_layers = process_query(
                 dialog=self.dialog,
                 query=query,
                 description=data['description'],
-                layer_name=data['query_name'][k],
+                layer_name=name,
                 white_list_values=data['white_list_column'][k],
                 area=data['area'][k],
                 bbox=data['bbox'][k],
